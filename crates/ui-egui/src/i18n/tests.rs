@@ -39,7 +39,7 @@ fn catalog_is_valid_and_preserves_placeholders_and_ellipses() {
 /// to English for what they don't cover yet; their gaps are reported, not enforced, so adding a
 /// command doesn't require a row in every language.
 const REQUIRED: &[&str] = &["uk"];
-const REPORTED: &[&str] = &["pt-BR", "de", "es", "cs", "ru", "fr", "zh", "it"];
+const REPORTED: &[&str] = &["pt-BR", "de", "es", "cs", "ru", "fr", "zh", "it", "nb"];
 
 fn check(language: &str, what: &str, missing: Vec<String>) {
     if REQUIRED.contains(&language) {
@@ -598,4 +598,16 @@ fn chinese_needs_an_installed_cjk_font() {
 #[test]
 fn hatch_dialog_extents_label_says_extents_in_ukrainian() {
     assert_eq!(tr("uk", "Default to boundary extents"), "Типово за габаритами контуру");
+}
+
+#[test]
+fn norwegian_locales_select_the_bokmal_catalog() {
+    for tag in ["nb", "nb-NO", "nb_NO.UTF-8", "no", "nn-NO", "NO_no"] {
+        assert_eq!(locale_language(tag), Some("nb"), "{tag}");
+    }
+    assert_eq!(Preference::parse("nb"), Some(Preference::Norwegian));
+    assert_eq!(Preference::Auto.resolve(&["nb-NO".into(), "en-US".into()]), "nb");
+    assert_eq!(tr("nb", "Modify"), "Endre");
+    assert_eq!(tr("nb", "Layer Properties Manager"), "Behandling av lagegenskaper");
+    with_language("nb", || assert_eq!(t("Save As..."), "Lagre som..."));
 }

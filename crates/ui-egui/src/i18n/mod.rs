@@ -33,10 +33,12 @@ pub enum Preference {
     Chinese,
     #[serde(rename = "it")]
     Italian,
+    #[serde(rename = "nb")]
+    Norwegian,
 }
 
 impl Preference {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Auto,
         Self::English,
         Self::Ukrainian,
@@ -48,6 +50,7 @@ impl Preference {
         Self::French,
         Self::Chinese,
         Self::Italian,
+        Self::Norwegian,
     ];
 
     /// The codes a preference can be given as, for messages ("auto, en or uk").
@@ -72,6 +75,7 @@ impl Preference {
             Self::French => "fr",
             Self::Chinese => "zh",
             Self::Italian => "it",
+            Self::Norwegian => "nb",
         }
     }
 
@@ -88,6 +92,7 @@ impl Preference {
             Self::French => "Français",
             Self::Chinese => "简体中文",
             Self::Italian => "Italiano",
+            Self::Norwegian => "Norsk (bokmål)",
         }
     }
 
@@ -112,6 +117,7 @@ impl Preference {
             Self::French => "fr",
             Self::Chinese => "zh",
             Self::Italian => "it",
+            Self::Norwegian => "nb",
             Self::Auto => locales.iter().find_map(|s| locale_language(s)).unwrap_or("en"),
         }
     }
@@ -128,7 +134,7 @@ pub struct Language {
     catalog: OnceLock<Catalog<'static>>,
 }
 
-pub static LANGUAGES: [Language; 10] = [
+pub static LANGUAGES: [Language; 11] = [
     Language { code: "en", name: "English", source: "", plural: plural_en, plural_forms: 2, catalog: OnceLock::new() },
     Language {
         code: "uk", name: "Українська", source: include_str!("uk.tsv"), plural: plural_uk, plural_forms: 3, catalog: OnceLock::new()
@@ -155,12 +161,16 @@ pub static LANGUAGES: [Language; 10] = [
     Language { code: "zh", name: "简体中文", source: include_str!("zh.tsv"), plural: plural_en, plural_forms: 2, catalog: OnceLock::new() },
     // Italian integer plurals (CLDR `it`) follow the English rule: one (1), other.
     Language { code: "it", name: "Italiano", source: include_str!("it.tsv"), plural: plural_en, plural_forms: 2, catalog: OnceLock::new() },
+    // Norwegian Bokmål plurals follow the English rule: one (1), other. `no` (the macrolanguage)
+    // and Nynorsk `nn` read this catalog too (see `locale_language`).
+    Language { code: "nb", name: "Norsk (bokmål)", source: include_str!("nb.tsv"), plural: plural_en, plural_forms: 2, catalog: OnceLock::new() },
 ];
 
 /// BCP 47 and POSIX locale tags, including `uk-UA`, `uk_UA.UTF-8` and `pt_BR.UTF-8`.
 /// A catalog is chosen by the tag's primary language, so any `pt-*` tag selects `pt-BR`.
 pub fn locale_language(tag: &str) -> Option<&'static str> {
     let primary = tag.trim().split(['-', '_', '.', '@']).next()?;
+    let primary = if primary.eq_ignore_ascii_case("no") || primary.eq_ignore_ascii_case("nn") { "nb" } else { primary };
     LANGUAGES.iter().find(|l| l.code.split('-').next().is_some_and(|p| p.eq_ignore_ascii_case(primary))).map(|l| l.code)
 }
 
