@@ -206,6 +206,9 @@ pub struct CadApp {
     /// Drawings being read on worker threads ([`opening`]).
     pub opening: opening::Opening,
     pub integrated_titlebar: bool,
+    /// Whether the app owns its window: closing it asks about unsaved drawings first. A host that
+    /// embeds the editor in its own window turns this off and asks itself.
+    pub owns_window: bool,
     control_rx: Option<Receiver<ControlRequest>>,
     pending_shots: Vec<(u64, Option<String>, std::sync::mpsc::Sender<Value>, f64)>,
     queued_shots: Vec<(u64, f64, u32)>,
@@ -256,6 +259,7 @@ impl CadApp {
             status: None,
             opening: opening::Opening::default(),
             integrated_titlebar: false,
+            owns_window: true,
             control_rx: None,
             pending_shots: Vec::new(),
             queued_shots: Vec::new(),
@@ -515,6 +519,15 @@ impl CadApp {
         recent.truncate(RECENT_FILES);
     }
 
+    /// Installs the interface fonts, theme and animation settings again on the next frame. A host
+    /// that shares its window with the editor and puts its own look back while the editor is hidden
+    /// calls this when it is shown again.
+    pub fn restyle(&mut self) {
+        self.fonts_cjk = None;
+        self.shown_theme = None;
+        self.shown_animations = None;
+    }
+
     /// Per-frame logic before layout.
     pub fn logic(&mut self, ctx: &egui::Context) {
         // A long LISP routine runs a slice per frame, so the window stays live (and Esc stops it).
@@ -523,7 +536,7 @@ impl CadApp {
             ctx.request_repaint();
         }
         // Closing the window (title bar, File ▸ Exit, Cmd+Q) with unsaved changes asks first.
-        if ctx.input(|i| i.viewport().close_requested()) && self.request_quit() {
+        if self.owns_window && ctx.input(|i| i.viewport().close_requested()) && self.request_quit() {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
         }
         let cjk = self.language().starts_with("zh");

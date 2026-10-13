@@ -208,7 +208,43 @@ fn catalog(language: &str) -> Option<&'static Catalog<'static>> {
 }
 
 pub fn tr<'a>(language: &str, source: &'a str) -> &'a str {
-    catalog(language).and_then(|c| c.get(&("", source))).copied().unwrap_or(source)
+    branded(catalog(language).and_then(|c| c.get(&("", source))).copied().unwrap_or(source))
+}
+
+/// The product name a host program shows instead of "CADCraft" ([`set_product_name`]).
+static PRODUCT: OnceLock<&'static str> = OnceLock::new();
+
+/// Interface strings with the product name put in, made once each.
+static BRANDED: std::sync::Mutex<Vec<(String, &'static str)>> = std::sync::Mutex::new(Vec::new());
+
+/// A program that embeds the drawing editor under its own name: every interface string says `name`
+/// where it would say "CADCraft". Set once, before the first frame; later calls are ignored.
+pub fn set_product_name(name: &'static str) {
+    let _ = PRODUCT.set(name);
+}
+
+/// The product name the interface shows ("CADCraft" unless a host set another).
+pub fn product() -> &'static str {
+    PRODUCT.get().copied().unwrap_or("CADCraft")
+}
+
+/// `s` with the host's product name in place of "CADCraft" (unchanged without one).
+fn branded(s: &str) -> &str {
+    let Some(name) = PRODUCT.get() else { return s };
+    if !s.contains("CADCraft") {
+        return s;
+    }
+    let Ok(mut cache) = BRANDED.lock() else { return s };
+    if let Some((_, b)) = cache.iter().find(|(k, _)| k == s) {
+        return b;
+    }
+    // A bounded set: only the few interface strings that name the product.
+    if cache.len() >= 256 {
+        return s;
+    }
+    let b: &'static str = Box::leak(s.replace("CADCraft", name).into_boxed_str());
+    cache.push((s.to_owned(), b));
+    b
 }
 
 pub fn t(source: &str) -> &str {
@@ -218,7 +254,7 @@ pub fn t(source: &str) -> &str {
 /// Menu headings can differ from command or object labels (e.g. Czech Kótování / Kóta).
 /// Catalogs without a `menu` entry retain their ordinary translation.
 pub fn tr_menu<'a>(language: &str, source: &'a str) -> &'a str {
-    catalog(language).and_then(|c| c.get(&("menu", source))).copied().unwrap_or_else(|| tr(language, source))
+    catalog(language).and_then(|c| c.get(&("menu", source))).copied().map(branded).unwrap_or_else(|| tr(language, source))
 }
 
 pub fn menu(source: &str) -> &str {
